@@ -363,6 +363,7 @@ type NetworkDefaults struct {
 	Failsafe          []*FailsafeConfig        `yaml:"failsafe,omitempty" json:"failsafe"`
 	SelectionPolicy   *SelectionPolicyConfig   `yaml:"selectionPolicy,omitempty" json:"selectionPolicy"`
 	DirectiveDefaults *DirectiveDefaultsConfig `yaml:"directiveDefaults,omitempty" json:"directiveDefaults"`
+	IgnoreErrors      []*IgnoreErrorConfig     `yaml:"ignoreErrors,omitempty" json:"ignoreErrors"`
 	Evm               *EvmNetworkConfig        `yaml:"evm,omitempty" json:"evm" tstype:"TsEvmNetworkConfigForDefaults"`
 }
 
@@ -465,6 +466,7 @@ type UpstreamConfig struct {
 	IgnoreMethods                []string                 `yaml:"ignoreMethods,omitempty" json:"ignoreMethods"`
 	AllowMethods                 []string                 `yaml:"allowMethods,omitempty" json:"allowMethods"`
 	AutoIgnoreUnsupportedMethods *bool                    `yaml:"autoIgnoreUnsupportedMethods,omitempty" json:"autoIgnoreUnsupportedMethods"`
+	IgnoreErrors                 []*IgnoreErrorConfig     `yaml:"ignoreErrors,omitempty" json:"ignoreErrors"`
 	Failsafe                     []*FailsafeConfig        `yaml:"failsafe,omitempty" json:"failsafe"`
 	RateLimitBudget              string                   `yaml:"rateLimitBudget,omitempty" json:"rateLimitBudget"`
 	RateLimitAutoTune            *RateLimitAutoTuneConfig `yaml:"rateLimitAutoTune,omitempty" json:"rateLimitAutoTune"`
@@ -585,6 +587,37 @@ func (c *UpstreamConfig) Copy() *UpstreamConfig {
 		copy(copied.AllowMethods, c.AllowMethods)
 	}
 
+	if c.IgnoreErrors != nil {
+		copied.IgnoreErrors = make([]*IgnoreErrorConfig, len(c.IgnoreErrors))
+		for i, ignoreError := range c.IgnoreErrors {
+			copied.IgnoreErrors[i] = ignoreError.Copy()
+		}
+	}
+
+	return copied
+}
+
+type ErrorMatchType string
+
+const (
+	ErrorMatchTypeExact     ErrorMatchType = "exact"
+	ErrorMatchTypeSubstring ErrorMatchType = "substring"
+	ErrorMatchTypeWildcard  ErrorMatchType = "wildcard"
+	ErrorMatchTypeRegex     ErrorMatchType = "regex"
+)
+
+type IgnoreErrorConfig struct {
+	Message   string         `yaml:"message,omitempty" json:"message,omitempty"`
+	Code      string         `yaml:"code,omitempty" json:"code,omitempty"`
+	MatchType ErrorMatchType `yaml:"matchType,omitempty" json:"matchType,omitempty"`
+}
+
+func (c *IgnoreErrorConfig) Copy() *IgnoreErrorConfig {
+	if c == nil {
+		return nil
+	}
+	copied := &IgnoreErrorConfig{}
+	*copied = *c
 	return copied
 }
 

@@ -535,6 +535,22 @@ func (t *Tracker) RecordUpstreamFailure(up common.Upstream, method string, err e
 		return
 	}
 
+	// Check if this error should be ignored based on upstream configuration
+	if up != nil {
+		cfg := up.Config()
+		if cfg != nil && len(cfg.IgnoreErrors) > 0 {
+			matcher := common.NewErrorMatcher(cfg.IgnoreErrors)
+			if matcher.ShouldIgnoreError(err) {
+				t.logger.Debug().
+					Str("upstreamId", up.Id()).
+					Str("method", method).
+					Err(err).
+					Msg("ignoring error due to upstream ignoreErrors configuration")
+				return
+			}
+		}
+	}
+
 	for _, k := range t.getUpsKeys(up, method) {
 		t.getUpsMetrics(k).ErrorsTotal.Add(1)
 	}

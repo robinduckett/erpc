@@ -494,28 +494,38 @@ func (u *Upstream) Forward(ctx context.Context, nrq *common.NormalizedRequest, b
 						nrq.AgentName(),
 					).Inc()
 				} else {
+					// Check if this error should be ignored
+					shouldIgnore := u.shouldIgnoreError(errCall)
+					if shouldIgnore {
+						lg.Debug().Err(errCall).Msgf("ignoring error due to ignoreErrors configuration")
+					}
+
 					if common.HasErrorCode(errCall, common.ErrCodeEndpointCapacityExceeded) {
 						u.recordRemoteRateLimit(method, nrq)
 					}
-					u.metricsTracker.RecordUpstreamFailure(
-						u,
-						method,
-						errCall,
-					)
-					severity := common.ClassifySeverity(errCall)
-					telemetry.MetricUpstreamErrorTotal.WithLabelValues(
-						u.ProjectId,
-						u.VendorName(),
-						u.NetworkLabel(),
-						cfg.Id,
-						method,
-						common.ErrorFingerprint(errCall),
-						string(severity),
-						nrq.CompositeType(),
-						finality.String(),
-						nrq.UserId(),
-						nrq.AgentName(),
-					).Inc()
+
+					// Only record metrics if error is not ignored
+					if !shouldIgnore {
+						u.metricsTracker.RecordUpstreamFailure(
+							u,
+							method,
+							errCall,
+						)
+						severity := common.ClassifySeverity(errCall)
+						telemetry.MetricUpstreamErrorTotal.WithLabelValues(
+							u.ProjectId,
+							u.VendorName(),
+							u.NetworkLabel(),
+							cfg.Id,
+							method,
+							common.ErrorFingerprint(errCall),
+							string(severity),
+							nrq.CompositeType(),
+							finality.String(),
+							nrq.UserId(),
+							nrq.AgentName(),
+						).Inc()
+					}
 				}
 
 				timer.ObserveDuration(false)
@@ -1198,4 +1208,17 @@ func (u *Upstream) Cordon(method string, reason string) {
 
 func (u *Upstream) Uncordon(method string, reason string) {
 	u.metricsTracker.Uncordon(u, method, reason)
+}
+
+func (u *Upstream) shouldIgnoreError(err error) bool {
+	if err == nil || u == nil || u.config == nil {
+		return false
+	}
+
+	if len(u.config.IgnoreErrors) > 0 {
+		matcher := common.NewErrorMatcher(u.config.IgnoreErrors)
+		return matcher.ShouldIgnoreError(err)
+	}
+
+	return false
 }
